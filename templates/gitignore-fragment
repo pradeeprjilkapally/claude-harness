@@ -1,0 +1,9 @@
+# --- agent harness ---------------------------------------------------------
+# Session state, not project history.
+HANDOFF.md
+.claude/.workflow_state.json
+.claude/.mcp_snapshot.json
+
+# memory.md stays TRACKED on purpose: it mirrors a machine-local memory store so
+# other machines and other agents can read it. Gitignore it only if that mirror
+# holds something that must not leave this machine.

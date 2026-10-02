@@ -76,7 +76,7 @@ render_skills ".agents/skills" "AGENTS.md" "Codex"
 run mkdir -p "$TARGET/scripts"
 for f in "$HARNESS_DIR"/scripts/*.py; do
   base="$(basename "$f")"
-  case "$base" in _render.py|_marker.py) continue ;; esac   # installer-only helpers
+  case "$base" in _render.py|_marker.py|_merge_settings.py) continue ;; esac  # installer-only
   run cp "$f" "$TARGET/scripts/$base"
   render "$TARGET/scripts/$base"
 done
@@ -84,7 +84,7 @@ say "scripts -> scripts/"
 
 # --- management docs: seed once, never clobber ------------------------------
 seeded=0; kept=0
-for f in "$HARNESS_DIR"/templates/*; do
+for f in "$HARNESS_DIR"/templates/root/*; do
   base="$(basename "$f")"
   if [ -e "$TARGET/$base" ]; then
     kept=$((kept+1))
@@ -100,6 +100,49 @@ for f in WORKFLOW.md WORKFLOW_FULL_ORCHESTRATION.md; do
   if [ ! -e "$TARGET/$f" ]; then run cp "$HARNESS_DIR/docs/$f" "$TARGET/$f"; render "$TARGET/$f"; fi
 done
 say "workflow reference in place"
+
+# --- repo-level hook wiring -------------------------------------------------
+# These fire per-repo (the session-start task review, the Stop workflow guard,
+# the anti-slop reminder, the task.md -> RED-check trigger). Distinct from the
+# machine-wide hooks install-hooks.sh wires; both layers are needed.
+if [ "$DRY" = 0 ]; then
+  python3 "$HARNESS_DIR/scripts/_merge_settings.py" \
+    "$TARGET/.claude/settings.json" "$HARNESS_DIR/templates/claude-settings.json"
+else
+  say "would wire repo-level hooks into .claude/settings.json"
+fi
+
+# --- the pre-push gate ------------------------------------------------------
+# Without this the guard scripts are inert files: nothing blocks a push that has
+# no task entry or a red suite.
+HOOK_DIR="$(git -C "$TARGET" rev-parse --git-path hooks)"
+if [ "$DRY" = 0 ]; then
+  mkdir -p "$HOOK_DIR"
+  if [ -e "$HOOK_DIR/pre-push" ] && ! grep -q "harness" "$HOOK_DIR/pre-push" 2>/dev/null; then
+    cp "$HOOK_DIR/pre-push" "$HOOK_DIR/pre-push.before-harness"
+    say "existing pre-push backed up to pre-push.before-harness"
+  fi
+  cp "$HARNESS_DIR/templates/githooks/pre-push" "$HOOK_DIR/pre-push"
+  chmod +x "$HOOK_DIR/pre-push"
+fi
+say "pre-push gate installed"
+
+# --- branch-flow CI guard ---------------------------------------------------
+if [ ! -e "$TARGET/.github/workflows/pr-flow.yml" ]; then
+  run mkdir -p "$TARGET/.github/workflows"
+  run cp "$HARNESS_DIR/templates/workflows/pr-flow.yml" "$TARGET/.github/workflows/pr-flow.yml"
+  say "branch-flow CI guard -> .github/workflows/pr-flow.yml"
+else
+  say "pr-flow.yml already present — left untouched"
+fi
+
+# --- gitignore --------------------------------------------------------------
+# HANDOFF.md and the state files are session scratch; committing them is noise.
+if [ "$DRY" = 0 ] && ! grep -q "agent harness" "$TARGET/.gitignore" 2>/dev/null; then
+  printf '\n' >> "$TARGET/.gitignore"
+  cat "$HARNESS_DIR/templates/gitignore-fragment" >> "$TARGET/.gitignore"
+  say "gitignore entries appended"
+fi
 
 # --- the marker that opts this repo in --------------------------------------
 # hooks/hooklib.py keys off this file. No marker, no harness — which is what lets

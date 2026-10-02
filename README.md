@@ -11,8 +11,34 @@ templates they assume.
 ```
 
 `install-hooks.sh` copies the hooks into `~/.claude/hooks` and wires them into
-`~/.claude/settings.json` (backing it up first, and leaving existing entries
-alone). `install.sh` installs the skills, scripts, and templates into one repo.
+`~/.claude/settings.json` (backing it up first, leaving existing entries alone).
+Run it once per machine.
+
+`install.sh` sets up one repo:
+
+| Installs | Where |
+|---|---|
+| 16 skills, rendered per agent | `.claude/skills/`, `.agents/skills/` |
+| guard + workflow scripts | `scripts/` |
+| management files, seeded once | repo root |
+| repo-level hook wiring | `.claude/settings.json` (merged, never clobbered) |
+| the pre-push gate | `.git/hooks/pre-push` |
+| branch-flow CI guard | `.github/workflows/pr-flow.yml` |
+| opt-in marker | `.harness.json` |
+
+**The pre-push gate is what gives the workflow teeth.** It blocks a push whose
+branch has no `task.md` entry, whose PR is already merged, or whose tests fail —
+verified by installing into a clean repo and confirming an undocumented push is
+rejected while a documented one goes through. `git push --no-verify` overrides it
+for genuine emergencies.
+
+Declare your test command in `.harness.json` to arm the test gate:
+
+```json
+{ "test_command": "python -m pytest -q" }
+```
+
+Without one, that gate is skipped rather than guessing how to run your suite.
 
 Re-run `install.sh` to upgrade a repo. It is idempotent: management files the repo
 owns — `task.md`, `action_items.md`, `log.md`, `memory.md`, `config.md`,
@@ -104,9 +130,17 @@ report the current task state.
 ## Caveats
 
 - Installed files are copies. Editing a skill inside a consuming repo means the
-  next `install.sh` overwrites it — change it here and reinstall.
+  next `install.sh` overwrites it — change it here and reinstall. The files your
+  repo owns (`task.md` and the other management docs, `.claude/settings.json`,
+  `.gitignore`, an existing `pr-flow.yml`) are never overwritten.
+- An existing `.git/hooks/pre-push` is backed up to `pre-push.before-harness`
+  before being replaced.
 - `install-hooks.sh` edits `~/.claude/settings.json`. It backs up to
   `settings.json.harness-backup` first and only appends commands that are not
   already present, but it is your file: check the diff if you have customised it.
 - The skills assume the management files exist. Installing the scripts without the
   templates will leave `jarvis` and `ledger` with nothing to read.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
