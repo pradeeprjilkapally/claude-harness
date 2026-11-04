@@ -1,0 +1,8 @@
+[
+  {
+    "name": "ci-chase",
+    "command": "cd \"${CLAUDE_PROJECT_DIR}\" && python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/ci_watch.py\"",
+    "description": "CI verdict changes on this branch's PR",
+    "when": "on-skill-invoke:deploy-model"
+  }
+]

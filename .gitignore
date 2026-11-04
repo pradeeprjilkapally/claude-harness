@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# built plugin tree — regenerate with: python3 scripts/build_plugin.py
+dist/

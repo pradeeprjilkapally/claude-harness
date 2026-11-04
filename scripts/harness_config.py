@@ -11,6 +11,7 @@ scripts themselves are identical in every repo.
       "gh_repo": "owner/name",        # gh --repo target for the PR guards
       "data_dir_env": "APP_DATA_DIR", # env var naming the gitignored data dir
       "data_dir": "mydata",           # fallback when that env var is unset
+      "remote": "origin",             # the git remote the workflow pushes to
       "enabled": true
     }
 
@@ -45,6 +46,22 @@ def load(start=None):
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+
+def installed(start=None):
+    """True when this repo has opted in — a marker that is not switched off.
+
+    Every agent-facing hook keys off this, which is what lets one globally
+    installed harness (or one enabled plugin) stay completely silent in every
+    repository that has not asked for it.
+    """
+    cfg = load(start)
+    return bool(cfg) and cfg.get('enabled') is not False
+
+
+def remote(start=None):
+    """The git remote the workflow pushes to. `origin` unless the repo says otherwise."""
+    return load(start).get('remote') or 'origin'
 
 
 def gh_repo(start=None):

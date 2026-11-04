@@ -1,0 +1,14 @@
+{
+  "name": "pradeep-harness",
+  "description": "The agent workflow harness, as an installable plugin",
+  "owner": {
+    "name": "Pradeep"
+  },
+  "plugins": [
+    {
+      "name": "agent-workflow-harness",
+      "source": "./dist/plugin",
+      "description": "A tracked, gated workflow for agent-run repositories: one task in flight, done-checks proven red before the build, human-gated merges, and a task that is not finished until its outcome is recorded."
+    }
+  ]
+}

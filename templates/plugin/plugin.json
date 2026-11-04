@@ -1,0 +1,36 @@
+{
+  "name": "agent-workflow-harness",
+  "displayName": "Agent Workflow Harness",
+  "version": "__VERSION__",
+  "description": "A tracked, gated workflow for agent-run repositories: one task in flight, done-checks proven red before the build, a goal gate, a five-item review gate, human-gated merges, and a task that is not finished until its outcome is recorded.",
+  "author": {
+    "name": "__OWNER__"
+  },
+  "repository": "https://github.com/pradeeprjilkapally/claude-harness",
+  "license": "Apache-2.0",
+  "keywords": ["workflow", "task-tracking", "code-review", "ci", "pull-requests"],
+  "hooks": "./hooks/hooks.json",
+  "experimental": {
+    "monitors": "./monitors/monitors.json"
+  },
+  "userConfig": {
+    "owner": {
+      "type": "string",
+      "title": "Repository owner",
+      "description": "The person the skills hand decisions to — plan approvals, per-slice diff review, and the two merge gates. Shown by name in the workflow skills.",
+      "default": "the owner"
+    },
+    "gh_repo": {
+      "type": "string",
+      "title": "GitHub repository (owner/name)",
+      "description": "The gh --repo target for the PR guards. Set this where `origin` is a read-only upstream fork, otherwise the guards query the wrong repository and silently pass.",
+      "default": ""
+    },
+    "remote": {
+      "type": "string",
+      "title": "Push remote",
+      "description": "The git remote the skills tell you to push to. Left as origin unless this repo pushes somewhere else.",
+      "default": "origin"
+    }
+  }
+}
