@@ -43,6 +43,8 @@ prompt
  -> doc-sync      Haiku updates the second-brain .md files — committed into THIS PR
  -> review-gate   the 5 gate items, each looped to its own goal
  -> deploy        deploy-model: feature->develop PR (await OK) then develop->master (await OK)
+ -> outcome       own the loop to the end: record Outcome: merged / abandoned /
+                  taken-back in task.md. Until then the task is still in flight
 ```
 
 Stage state: `.claude/.workflow_state.json` via `scripts/workflow_state.py`.
@@ -171,12 +173,43 @@ Run the **`deploy-model`** skill after the goal is met:
 
 ## Sub-agent handshakes — don't kill until the handshake is good
 
-The **`subagent-handshake`** skill: never spawn-and-forget. Keep a sub-agent alive
-(via SendMessage) until it confirms it did exactly what was asked and you have
-verified its report; only then let it end and proceed. A dropped agent mid-loop
+The **`subagent-handshake`** skill: never spawn-and-forget, and **steer before
+you spawn** — an agent that already holds the task's context gets a follow-up
+via SendMessage; a fresh spawn is for genuinely disjoint work or a different
+model role, never an escape from an unresolved report. Keep a sub-agent alive
+until it confirms it did exactly what was asked and you have verified its
+report; only then let it end and proceed. A dropped agent mid-loop
 (e.g. the RED↔suite loop) breaks the guarantee the loop exists to provide.
 
 ---
+
+## Own the loop — a task ends at an outcome, not at a commit
+
+The chain does not stop when the code is written. A task is finished when **the
+PR is merged, the work is explicitly abandoned, or {{OWNER}} takes it back** —
+and the `Outcome:` line in `task.md` records which one. Nothing else settles it.
+
+`Status: complete` says only that the build is done. A block at `complete` with
+no `Outcome:` **still occupies the one-in-flight slot**, so the next task cannot
+start until the last one actually landed (`scripts/workflow_state.py guard`
+enforces it; `scripts/workflow_state.py outcome` lists what is awaiting one).
+`python3 scripts/check_merged.py` asks the forge what really merged and prints
+the line to record — it reports only, it never edits `task.md`.
+
+Between the PR opening and that outcome, CI is chased by a script, not by an
+agent on a timer: `scripts/ci_watch.py` polls `gh pr checks` and prints **only
+on a verdict change**, so the session hears `pending -> failing` and never
+hears "still running". `--once` is the read-only on-demand status. It reports;
+it never commits, pushes, merges, or re-runs a job.
+
+## Report cadence — quiet while it is working
+
+The **`report-cadence`** skill is the output contract for everything above:
+stay silent while the work is healthy, speak on the three moments that need a
+human — **blocked on {{OWNER}}, ready to merge, done** — and batch the rest into
+one digest rather than narrating each stage. Bad news overrides the cadence and
+is reported when learned. Per-slice diff review stays a speak-now event: the
+digest rule covers narration *inside* a slice, never the slice gate itself.
 
 ## Conventions carried over
 
