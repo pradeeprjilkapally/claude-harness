@@ -23,6 +23,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import harness_config
+
 PLAN_RE = re.compile(r'plans/(?P<slug>[^/]+?)_(?P<date>\d{4}-\d{2}-\d{2})_plan\.md$')
 
 
@@ -42,8 +45,13 @@ def branch_name(task_id, slug):
 
 
 def develop_ref():
-    """Prefer a local develop, else the remote-tracking ref."""
-    for ref in ('develop', '{{REMOTE}}/develop'):
+    """Prefer a local develop, else the remote-tracking ref.
+
+    The remote comes from the repo's own marker rather than a rendered
+    placeholder: a plugin-delivered script is shared by every repo, so it cannot
+    carry one repo's remote baked in.
+    """
+    for ref in ('develop', f'{harness_config.remote()}/develop'):
         if git('rev-parse', '--verify', '--quiet', ref)[0] == 0:
             return ref
     return None

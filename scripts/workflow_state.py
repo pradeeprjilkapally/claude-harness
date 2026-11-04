@@ -28,6 +28,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import harness_config
+
 STAGES = ['idle', 'classify', 'branch', 'prguard', 'breakdown', 'redcheck',
           'plan', 'build', 'itemgoals', 'goalmet', 'docsync', 'reviewgate',
           'deploy']
@@ -239,6 +242,15 @@ def directive_json(stage):
     text = DIRECTIVES.get(stage)
     if not text:
         return None
+    # Resolved here rather than at import: a directive is emitted rarely, and
+    # reading the marker costs a git call. Scripts cannot use the plugin's
+    # ${user_config.*} substitution — that applies to skill markdown only — so a
+    # plugin-delivered copy keeps the placeholders and resolves them from the
+    # repo's own marker. After install.sh has rendered them this is a no-op, so
+    # both delivery paths end up correct.
+    if '{{' in text:
+        text = (text.replace('{{REMOTE}}', harness_config.remote())
+                    .replace('{{OWNER}}', harness_config.owner()))
     return json.dumps({
         'hookSpecificOutput': {
             'hookEventName': 'PostToolUse',

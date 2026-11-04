@@ -46,15 +46,14 @@ SKILL_TOKENS = {
 }
 
 # `${user_config.*}` is substituted ONLY in skill/agent/command markdown, hook
-# commands and MCP config — never inside a .py file. Scripts therefore keep
-# reading the per-repo marker at runtime (scripts/harness_config.py), and the
-# placeholders left in them render to the same defaults install.sh uses.
+# commands and MCP config — never inside a .py file. So the per-repo values are
+# deliberately NOT rendered into scripts: {{OWNER}} and {{REMOTE}} survive into
+# the built plugin and are resolved at runtime from the repo's own
+# .harness.json (scripts/harness_config.py). Rendering them here would freeze
+# one repo's values into a script every repo shares.
 SCRIPT_TOKENS = {
     '{{AGENT_DOC}}': 'CLAUDE.md',
     '{{AGENT_NAME}}': 'Claude',
-    '{{OWNER}}': 'the owner',
-    '{{GH_REPO}}': 'owner/name',
-    '{{REMOTE}}': 'origin',
     '{{REPO_PATH}}': '.',
 }
 
@@ -131,12 +130,12 @@ def main(argv=None):
     (out / '.claude-plugin' / 'plugin.json').write_text(
         json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
-    # Match the harness's own token names, not any '{{': the bundled
-    # pr-flow.yml legitimately carries GitHub Actions '${{ github.head_ref }}'.
+    # Only the markdown has to be fully rendered: that is where Claude Code
+    # substitutes ${user_config.*} at load. Scripts keep {{OWNER}}/{{REMOTE}} on
+    # purpose (resolved at runtime), and the bundled pr-flow.yml legitimately
+    # carries GitHub Actions' own '${{ github.head_ref }}'.
     leftover = []
-    for f in sorted(out.rglob('*')):
-        if not f.is_file():
-            continue
+    for f in sorted((out / 'skills').rglob('*.md')) + sorted((out / 'docs').rglob('*.md')):
         body = f.read_text(encoding='utf-8', errors='replace')
         if any(tok in body for tok in SKILL_TOKENS):
             leftover.append(str(f.relative_to(out)))

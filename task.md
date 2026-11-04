@@ -30,7 +30,7 @@ guard and the commit-message hook key on — do not un-indent them.
 
 Task:         01-041126
 Date:         2026-11-04
-Status:       active · S1/4
+Status:       complete 2026-11-04 — ship pending
 Outcome:
 Branch:       feature/01-041126-grok-parity
 Type:         harness improvement
@@ -57,6 +57,18 @@ Done-check:   `python3 scripts/build_plugin.py && claude plugin validate
                   `claude plugin validate ./.` passes for the marketplace;
                   `python3 scripts/ci_watch.py --once` prints a CI state line
                   without writing anything; `python3 -m pytest tests -q` green.
+Result:       All four entities landed and the plugin installs. Verified:
+              `claude plugin validate ./dist/plugin` and `claude plugin
+              validate .` both print "Validation passed"; the plugin installed
+              and enabled at user scope with its three userConfig values
+              stored in ~/.claude/settings.json; 33 tests green; a
+              plugin-delivered workflow_state.py resolved OWNER=Pradeep and
+              REMOTE=rebalancer from a scratch repo's own marker at runtime;
+              install.sh still renders the installer path with zero tokens
+              left. check_merged.py resolved all 12 of pyPMClient's stale
+              "ship pending" tasks to real merged PRs (#80-#105). This task's
+              own Outcome is deliberately blank — by its own rule it is not
+              finished until the PR merges.
 Out-of-scope: The stale two-level templates/root/task.md vs the three-level
                   format the parser expects (pre-existing; filed as a follow-up,
                   not fixed here). No auto-fix-PR autonomy. No external

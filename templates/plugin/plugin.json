@@ -9,10 +9,6 @@
   "repository": "https://github.com/pradeeprjilkapally/claude-harness",
   "license": "Apache-2.0",
   "keywords": ["workflow", "task-tracking", "code-review", "ci", "pull-requests"],
-  "hooks": "./hooks/hooks.json",
-  "experimental": {
-    "monitors": "./monitors/monitors.json"
-  },
   "userConfig": {
     "owner": {
       "type": "string",

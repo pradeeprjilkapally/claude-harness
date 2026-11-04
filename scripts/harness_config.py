@@ -12,6 +12,7 @@ scripts themselves are identical in every repo.
       "data_dir_env": "APP_DATA_DIR", # env var naming the gitignored data dir
       "data_dir": "mydata",           # fallback when that env var is unset
       "remote": "origin",             # the git remote the workflow pushes to
+      "owner": "Your Name",           # who approves plans and merges
       "enabled": true
     }
 
@@ -57,6 +58,11 @@ def installed(start=None):
     """
     cfg = load(start)
     return bool(cfg) and cfg.get('enabled') is not False
+
+
+def owner(start=None):
+    """The person the workflow hands decisions to. Generic unless the repo says."""
+    return load(start).get('owner') or 'the owner'
 
 
 def remote(start=None):

@@ -58,7 +58,8 @@ def main() -> int:
         print(f"[merge-guard] ❌ branch '{branch}' already has MERGED PR #{n} — "
               "pushing here orphans the commit (it won't reach develop/master).")
         print("[merge-guard]    Branch fresh off develop for follow-up work: "
-              "git checkout -b feature/<NN-DDMMYY>-<slug> {{REMOTE}}/develop")
+              f"git checkout -b feature/<NN-DDMMYY>-<slug> "
+              f"{harness_config.remote()}/develop")
         return 1
     return 0
 
