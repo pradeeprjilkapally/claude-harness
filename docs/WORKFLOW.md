@@ -189,12 +189,18 @@ The chain does not stop when the code is written. A task is finished when **the
 PR is merged, the work is explicitly abandoned, or {{OWNER}} takes it back** —
 and the `Outcome:` line in `task.md` records which one. Nothing else settles it.
 
-`Status: complete` says only that the build is done. A block at `complete` with
-no `Outcome:` **still occupies the one-in-flight slot**, so the next task cannot
-start until the last one actually landed (`scripts/workflow_state.py guard`
-enforces it; `scripts/workflow_state.py outcome` lists what is awaiting one).
-`python3 scripts/check_merged.py` asks the forge what really merged and prints
-the line to record — it reports only, it never edits `task.md`.
+`Status: complete` says only that the build is done. Two different questions
+follow from that, and they are deliberately kept apart:
+
+- **Is it being worked?** `Status: complete` releases the one-in-flight slot, so
+  the next task can start. The slot is about attention, and a task waiting on a
+  human merge gate is not consuming any — blocking on it would make the workflow
+  hostage to review latency. Enforced by `scripts/workflow_state.py guard`.
+- **Has it landed?** Not until `Outcome:` is set. The guard reports every
+  complete-without-outcome task as a standing nudge, and never blocks on one;
+  `scripts/workflow_state.py outcome` lists them, and
+  `python3 scripts/check_merged.py` asks the forge what really merged and prints
+  the line to record — it reports only, it never edits `task.md`.
 
 Between the PR opening and that outcome, CI is chased by a script, not by an
 agent on a timer: `scripts/ci_watch.py` polls `gh pr checks` and prints **only

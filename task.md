@@ -26,6 +26,57 @@ guard and the commit-message hook key on — do not un-indent them.
 
 ## Active
 
+## 01-061126 — the seeded task.md is in the format the parsers read
+
+Task:         01-061126
+Date:         2026-11-06
+Status:       active · S1/2
+Outcome:
+Branch:       feature/01-061126-task-template
+Type:         harness improvement
+Goal:         A freshly seeded repo gets a task.md that workflow_state and the
+              pre-push guard can actually read, and awaiting a merge no longer
+              blocks the next task from starting.
+Constraints:  The template must still parse to ZERO in-flight tasks when
+              untouched, and must never satisfy the pre-push guard's ^Task:
+              grep with its own example text. Archive rows keep their
+              unindented `Task:` prefix so historical ids still resolve.
+              Stacked on feature/01-041126-grok-parity: that branch merges
+              first.
+Inputs:       templates/root/task.md, templates/root/task_archive.md,
+              scripts/workflow_state.py, skills/jarvis/SKILL.md,
+              skills/task-breakdown/SKILL.md, docs/WORKFLOW.md
+Outputs:      a three-level templates/root/task.md with a copyable scaffold;
+              in_flight/awaiting_outcome split; tests/test_template.py
+Done-check:   `python3 -m pytest tests -q` green, and in a fresh
+              `./install.sh <scratch>` repo
+              `python3 scripts/workflow_state.py guard` exits 0 while
+              the seeded task.md parses to zero blocks — then filling the
+              template's own scaffold yields exactly one in-flight task that
+              satisfies `check_task_tracked.py`.
+Out-of-scope: The jarvis/task-breakdown skills' own prose (already correct).
+              No change to how task_archive.md is structured.
+
+### S1 — awaiting a merge no longer blocks the next task
+
+Files:        scripts/workflow_state.py, tests/test_outcome.py
+Done-check:   `python3 -m pytest tests/test_outcome.py -q` green with a
+              `complete`-no-Outcome block counted as NOT in flight but still
+              listed by `workflow_state.py outcome`.
+- [ ] in_flight() means "being worked": parked and complete both release the slot
+- [ ] the guard still reports unrecorded outcomes, as a warning that never blocks
+- [ ] tests/test_outcome.py pins the distinction rather than the old conflation
+
+### S2 — the seeded template is the three-level format
+
+Files:        templates/root/task.md, tests/test_template.py, docs/WORKFLOW.md
+Done-check:   `python3 -m pytest tests/test_template.py -q` green: the untouched
+              template parses to zero blocks and satisfies no guard, and its own
+              copyable scaffold fills in to exactly one readable task.
+- [ ] Active / Parked / Archive index sections, in that order
+- [ ] a COPY FROM HERE scaffold carrying macro + slice + item
+- [ ] the lifecycle prose matches the archive model, not comment-it-out
+
 ## 01-041126 — port the four Grok "own the loop" entities and ship the harness as a plugin
 
 Task:         01-041126
