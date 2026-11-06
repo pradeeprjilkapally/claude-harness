@@ -33,6 +33,13 @@ def scaffold():
     return body[start:body.index(SCAFFOLD_END, start)].strip('\n')
 
 
+def heading_line(body, heading):
+    """Offset of the real `## <heading>` LINE, not a mention of it in prose."""
+    m = re.search(r'^## ' + re.escape(heading) + r'\s*$', body, re.M)
+    assert m, f'no {heading!r} heading line'
+    return m.start()
+
+
 def filled():
     """The template with one real task filled into its Active section."""
     block = (scaffold()
@@ -40,12 +47,13 @@ def filled():
              .replace('<title>', 'a worked example')
              .replace('<slug>', 'worked-example'))
     body = template()
-    return body.replace('## Parked', block + '\n\n## Parked', 1)
+    at = heading_line(body, 'Active') + len('## Active')
+    return body[:at] + '\n\n' + block + body[at:]
 
 
 def test_the_three_sections_exist_in_order():
     body = template()
-    positions = [body.index(h) for h in ('## Active', '## Parked', '## Archive index')]
+    positions = [heading_line(body, h) for h in ('Active', 'Parked', 'Archive index')]
     assert positions == sorted(positions)
 
 
@@ -59,10 +67,16 @@ def test_the_example_fields_cannot_be_mistaken_for_a_real_task():
     assert check_task_tracked.documented_task_ids(template()) == set()
 
 
-def test_no_unindented_field_line_outside_a_task_block():
-    """An unindented `Task:` in the prose is what fools both parsers."""
-    live = re.split(r'^## Active', template(), flags=re.M)[0]
-    assert not re.search(r'^Task:', live, re.M)
+def test_no_line_anywhere_satisfies_the_guards_id_pattern():
+    """The template may name `Task:`, but never with a parseable id."""
+    assert not re.search(r'^Task:\s+\d{2}-\d{6}', template(), re.M)
+
+
+def test_the_documented_fields_are_indented_but_the_scaffold_is_not():
+    """Both halves matter: the prose must not parse, the scaffold must."""
+    doc = template()[:template().index(SCAFFOLD_START)]
+    assert re.search(r'^  Task:', doc, re.M), 'documented fields must be indented'
+    assert re.search(r'^Task:', scaffold(), re.M), 'scaffold fields must not be'
 
 
 def test_the_template_carries_a_copyable_scaffold():

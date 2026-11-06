@@ -30,7 +30,7 @@ guard and the commit-message hook key on — do not un-indent them.
 
 Task:         01-061126
 Date:         2026-11-06
-Status:       active · S1/2
+Status:       complete 2026-11-06 — ship pending
 Outcome:
 Branch:       feature/01-061126-task-template
 Type:         harness improvement
@@ -56,6 +56,18 @@ Done-check:   `python3 -m pytest tests -q` green, and in a fresh
               satisfies `check_task_tracked.py`.
 Out-of-scope: The jarvis/task-breakdown skills' own prose (already correct).
               No change to how task_archive.md is structured.
+Result:       46 tests green. In a fresh `./install.sh` repo the seeded task.md
+              now parses: zero in-flight blocks and zero documented ids on a
+              clean slate, three headings in order. Copying its own scaffold
+              into ## Active — the way an agent would — yields exactly one
+              in-flight task (`01-061126`, `active · S1/1`), and the real
+              pre-push guard then passes for that branch while correctly
+              BLOCKING `feature/99-311299-undocumented` (exit 1). Before this,
+              a seeded file parsed to nothing and both guards were inert.
+              S1 also corrected 01-041126: `complete — ship pending` no longer
+              holds the one-in-flight slot (that stalled the next task behind a
+              human merge gate); it is now reported by a non-blocking nudge
+              instead. This task's own Outcome stays blank until its PR merges.
 
 ### S1 — awaiting a merge no longer blocks the next task
 
