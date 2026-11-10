@@ -1,4 +1,15 @@
-# Skill: verify-change
+---
+name: verify-change
+description: >-
+  Write and run a verification script that proves a feature works end-to-end,
+  then state the delivery as verified / not-verified / known-issues. Invoke it
+  before claiming a change is done, whenever a done-check needs a runnable
+  artefact rather than a manual observation, and when a result was only ever
+  seen against a fixture or temp directory — a sandbox pass is not a
+  verification.
+---
+
+# Verify a change — on the real path
 
 Write and run a verification script to confirm a feature works end-to-end.
 

@@ -20,6 +20,7 @@ Usage:
     workflow_state.py advance             -> move to the next stage
     workflow_state.py directive [<stage>] -> hook JSON for that stage
     workflow_state.py guard               -> exit 1 if >1 in-flight task
+    workflow_state.py outcome             -> exit 1 if a task awaits an outcome
     workflow_state.py on-task-updated     -> guard + directive for redcheck
 """
 import json
@@ -27,9 +28,15 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import harness_config
+
 STAGES = ['idle', 'classify', 'branch', 'prguard', 'breakdown', 'redcheck',
           'plan', 'build', 'itemgoals', 'goalmet', 'docsync', 'reviewgate',
           'deploy']
+
+# The three ways work actually ends. Anything else leaves a task in flight.
+TERMINAL_OUTCOMES = ('merged', 'abandoned', 'taken-back')
 
 STATE_FILE = '.claude/.workflow_state.json'
 TASK_MD = 'task.md'
@@ -128,10 +135,14 @@ DIRECTIVES = {
         "(same-session evidence). Nothing ships that skips a line."
     ),
     'deploy': (
-        "WORKFLOW [deploy]: run the `deploy-model` skill — HUMAN-GATED. Open the "
+        "WORKFLOW [deploy]: run the `deploy-model` skill — HUMAN-GATED. OWN THE "
+        "LOOP: this task is not finished when the code is written, it is finished "
+        "when the PR is MERGED, the work is explicitly ABANDONED, or {{OWNER}} takes "
+        "it back — and the `Outcome:` line in task.md records which. Open the "
         "feature->develop PR, ping {{OWNER}} the diff, merge on their 'good'; then "
-        "open the develop->master PR, hand it to him, merge on his 'good'. Never "
-        "auto-merge. Packages build only on the master release tag "
+        "open the develop->master PR, hand it to him, merge on his 'good'. Then "
+        "write the Outcome line (`python3 scripts/check_merged.py` reports it). "
+        "Never auto-merge. Packages build only on the master release tag "
         "(package.yml is release-tag-only). Add the push item to "
         "action_items.md — never push automatically (git push {{REMOTE}}, never "
         "origin)."
@@ -160,31 +171,86 @@ def write_state(state):
 
 
 def active_blocks(task_md_text):
-    """(task_id, status) for every block under '## Active'.
+    """(task_id, status, outcome) for every block under '## Active'.
 
     Blocks are '## <NN-DDMMYY> — title' headings; the section ends at the next
-    top-level heading (## Parked / ## Archive index).
+    top-level heading (## Parked / ## Archive index). Field lines in a live
+    block are unindented — the FORMAT comment keeps its example fields indented
+    so the template text is not parsed as a real entry.
     """
     section = re.split(r'^## (?:Parked|Archive index)', task_md_text, flags=re.M)[0]
     out = []
     for chunk in re.split(r'^## (?=\d{2}-\d{6})', section, flags=re.M)[1:]:
         tid = re.search(r'^Task:\s+(\d{2}-\d{6})', chunk, re.M)
         status = re.search(r'^Status:\s*(.*)', chunk, re.M)
+        outcome = re.search(r'^Outcome:\s*(.*)', chunk, re.M)
         if tid:
-            out.append((tid.group(1), (status.group(1) if status else '').strip()))
+            out.append((tid.group(1),
+                        (status.group(1) if status else '').strip(),
+                        (outcome.group(1) if outcome else '').strip()))
     return out
 
 
+def terminal_outcome(outcome):
+    """The recorded outcome if it is one of the three that finish a task.
+
+    Work is done when the PR is merged, the work is explicitly abandoned, or the
+    owner takes it back — nothing else. Free text in the field is not an
+    outcome: an unrecognised value leaves the task in flight rather than
+    silently settling it.
+    """
+    first = outcome.strip().split()[0].rstrip(':').lower() if outcome.strip() else ''
+    return first if first in TERMINAL_OUTCOMES else None
+
+
 def in_flight(task_md_text):
-    """Active blocks still being worked — 'complete …' ones are awaiting merge."""
-    return [(t, s) for t, s in active_blocks(task_md_text)
-            if not s.lower().startswith('complete')]
+    """Active blocks still being worked, as (task_id, status).
+
+    A block leaves the in-flight set only when it is parked or carries a
+    terminal Outcome. `Status: complete` alone does NOT release the slot: the
+    PR may still be open, and a repo that treats `complete — ship pending` as
+    finished loses track of whether the work ever landed.
+    """
+    live = []
+    for tid, status, outcome in active_blocks(task_md_text):
+        low = status.lower()
+        if low.startswith('pending') or 'parked' in low:
+            continue                       # deliberately set aside, not in flight
+        if terminal_outcome(outcome):
+            continue                       # merged / abandoned / taken back
+        live.append((tid, status))
+    return live
+
+
+def settled(task_md_text):
+    """(task_id, outcome) for every active block that reached a real end."""
+    return [(tid, outcome) for tid, _, outcome in active_blocks(task_md_text)
+            if terminal_outcome(outcome)]
+
+
+def awaiting_outcome(task_md_text):
+    """(task_id, status) for blocks marked complete with no outcome recorded.
+
+    These are the ones to chase: the build is finished, so the only question
+    left is whether the PR actually merged.
+    """
+    return [(tid, status) for tid, status, outcome in active_blocks(task_md_text)
+            if status.lower().startswith('complete') and not terminal_outcome(outcome)]
 
 
 def directive_json(stage):
     text = DIRECTIVES.get(stage)
     if not text:
         return None
+    # Resolved here rather than at import: a directive is emitted rarely, and
+    # reading the marker costs a git call. Scripts cannot use the plugin's
+    # ${user_config.*} substitution — that applies to skill markdown only — so a
+    # plugin-delivered copy keeps the placeholders and resolves them from the
+    # repo's own marker. After install.sh has rendered them this is a no-op, so
+    # both delivery paths end up correct.
+    if '{{' in text:
+        text = (text.replace('{{REMOTE}}', harness_config.remote())
+                    .replace('{{OWNER}}', harness_config.owner()))
     return json.dumps({
         'hookSpecificOutput': {
             'hookEventName': 'PostToolUse',
@@ -203,8 +269,11 @@ def cmd_guard():
         ids = ', '.join(t for t, _ in live)
         print(json.dumps({'systemMessage':
                           f'WORKFLOW: {len(live)} in-flight tasks under ## Active '
-                          f'({ids}). One primary task at a time — park or complete '
-                          f'the others before starting another.'}))
+                          f'({ids}). One primary task at a time — park the others, '
+                          f'or finish them: a task is done only once its Outcome is '
+                          f'recorded (merged / abandoned / taken-back). Run '
+                          f'`python3 scripts/check_merged.py` to see which already '
+                          f'merged.'}))
         return 1
     return 0
 
@@ -237,6 +306,20 @@ def main(argv):
             print(out)
     elif cmd == 'guard':
         return cmd_guard()
+    elif cmd == 'outcome':
+        try:
+            text = open(_repo_file(TASK_MD), encoding='utf-8').read()
+        except OSError:
+            print('task.md not found at the repo root.')
+            return 0
+        waiting = awaiting_outcome(text)
+        for tid, status in waiting:
+            print(f'{tid:<12} AWAITING OUTCOME  ({status})')
+        for tid, outcome in settled(text):
+            print(f'{tid:<12} {terminal_outcome(outcome).upper():<17} {outcome}')
+        if not waiting and not settled(text):
+            print('no active task has reached completion yet.')
+        return 1 if waiting else 0
     elif cmd == 'on-task-updated':
         # task.md was written: enforce one-in-flight, then demand the RED check —
         # but ONLY for a genuinely new task. A progress edit (tick a box, fill

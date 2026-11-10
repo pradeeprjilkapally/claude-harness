@@ -4,7 +4,7 @@
 Installer-only; not copied into consuming repos. Existing keys are preserved so
 an upgrade never discards settings the repo added by hand.
 
-    _marker.py <path> <version> <gh_repo> <data_dir> <data_dir_env>
+    _marker.py <path> <version> <gh_repo> <data_dir> <data_dir_env> [remote] [owner]
 """
 import json
 import os
@@ -13,6 +13,8 @@ import sys
 
 def main():
     path, version, gh_repo, data_dir, data_dir_env = sys.argv[1:6]
+    remote = sys.argv[6] if len(sys.argv) > 6 else ''
+    owner = sys.argv[7] if len(sys.argv) > 7 else ''
     cfg = {}
     if os.path.exists(path):
         try:
@@ -30,6 +32,13 @@ def main():
         cfg.setdefault('data_dir', data_dir)
     if data_dir_env:
         cfg['data_dir_env'] = data_dir_env
+    if owner:
+        cfg['owner'] = owner
+    if remote:
+        # Persisted, not only rendered into the skills: the guards resolve the
+        # remote at runtime (a plugin-delivered script is shared by every repo),
+        # so a remote the installer knew but never wrote down would be lost.
+        cfg['remote'] = remote
     with open(path, 'w') as f:
         json.dump(cfg, f, indent=2)
         f.write('\n')

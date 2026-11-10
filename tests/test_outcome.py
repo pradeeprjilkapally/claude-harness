@@ -1,0 +1,60 @@
+"""A task is not finished until its terminal outcome is recorded.
+
+Grok's Engineering Lead draws the line at "the PR is merged, the work is
+explicitly abandoned, or the user takes it back". The harness used to release
+the one-in-flight slot as soon as Status read `complete`, which is why a repo
+could accumulate eight tasks at `complete — ship pending` with nothing tracking
+whether any of them ever landed.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+import workflow_state
+
+
+def block(status, outcome=''):
+    return (
+        '# Task\n\n## Active\n\n'
+        '## 01-041126 — a task\n\n'
+        'Task:         01-041126\n'
+        f'Status:       {status}\n'
+        f'Outcome:      {outcome}\n'
+        '\n## Parked\n'
+    )
+
+
+def test_active_task_is_in_flight():
+    assert workflow_state.in_flight(block('active · S1/4')) == [('01-041126', 'active · S1/4')]
+
+
+def test_complete_without_outcome_still_holds_the_slot():
+    """The gap this closes: `complete — ship pending` is not done."""
+    assert len(workflow_state.in_flight(block('complete 2026-11-04 — ship pending'))) == 1
+
+
+def test_merged_outcome_releases_the_slot():
+    assert workflow_state.in_flight(block('complete 2026-11-04', 'merged #12')) == []
+
+
+def test_abandoned_outcome_releases_the_slot():
+    assert workflow_state.in_flight(
+        block('complete 2026-11-04', 'abandoned 2026-11-04 — superseded')) == []
+
+
+def test_taken_back_outcome_releases_the_slot():
+    assert workflow_state.in_flight(block('complete 2026-11-04', 'taken-back 2026-11-04')) == []
+
+
+def test_parked_task_is_not_in_flight():
+    assert workflow_state.in_flight(block('pending — parked 2026-11-04')) == []
+
+
+def test_unrecognised_outcome_does_not_release_the_slot():
+    """Only the three terminal words settle a task — not any text at all."""
+    assert len(workflow_state.in_flight(block('complete 2026-11-04', 'probably fine'))) == 1
+
+
+def test_settled_reports_the_recorded_outcome():
+    assert workflow_state.settled(block('complete 2026-11-04', 'merged #12')) == \
+        [('01-041126', 'merged #12')]

@@ -149,7 +149,7 @@ fi
 # one set of globally-installed hooks stay silent in every other repo.
 if [ "$DRY" = 0 ]; then
   python3 "$HARNESS_DIR/scripts/_marker.py" \
-    "$TARGET/.harness.json" "$VERSION" "$GH_REPO" "$DATA_DIR" "$DATA_DIR_ENV"
+    "$TARGET/.harness.json" "$VERSION" "$GH_REPO" "$DATA_DIR" "$DATA_DIR_ENV" "$REMOTE" "$OWNER"
 fi
 say "marker -> .harness.json (version $VERSION${GH_REPO:+, gh_repo $GH_REPO})"
 

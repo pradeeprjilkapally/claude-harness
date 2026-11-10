@@ -16,6 +16,13 @@ Lifecycle (maintained by Claude):
 
 Date:         when the task was filed
 Status:       (leave empty; Claude sets complete/pending)
+Outcome:      merged <ref> | abandoned <date> — <why> | taken-back <date>
+              The task is NOT finished until this line is set. `Status:
+              complete` records only that the build is done — the work has
+              not landed until the PR is merged, is explicitly abandoned, or
+              {{OWNER}} takes it back, and a complete task with no Outcome
+              still occupies the one-in-flight slot.
+              `python3 scripts/check_merged.py` reports what actually merged.
 Task:         <Incremental_Number_First_task_for_day_starts_With_01>-<DDMMYY>
 Goal:         the one outcome, in a sentence.
 Constraints:  what it must (and must not) do. Stack, perf, style, security.
@@ -29,6 +36,7 @@ Out-of-scope: what NOT to touch, so it doesn't wander.
 
 Date:
 Status:
+Outcome:
 Task:
 Goal:
 Constraints:

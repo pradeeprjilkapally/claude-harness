@@ -1,0 +1,82 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/session_review.py\"",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR}\" && python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/workflow_state.py\" guard 2>/dev/null || true",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\":\"Anti-slop check: no generic placeholders, no TODO comments, no filler copy, no invented values. Every change must be purposeful and match the existing code style. If unsure, read the file first.\"}'",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/memory_mirror.py\" 2>/dev/null || true",
+            "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/on_task_updated.py\" 2>/dev/null || true",
+            "shell": "bash",
+            "statusMessage": "workflow: task.md updated -> RED done-check"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/log_commit.py\" 2>/dev/null || true",
+            "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/tooling_decision.py\" nudge 2>/dev/null || true",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session_handoff.py\" 2>/dev/null || true",
+            "shell": "bash"
+          }
+        ]
+      }
+    ]
+  }
+}
