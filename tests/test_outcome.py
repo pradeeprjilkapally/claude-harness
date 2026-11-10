@@ -28,9 +28,24 @@ def test_active_task_is_in_flight():
     assert workflow_state.in_flight(block('active · S1/4')) == [('01-041126', 'active · S1/4')]
 
 
-def test_complete_without_outcome_still_holds_the_slot():
-    """The gap this closes: `complete — ship pending` is not done."""
-    assert len(workflow_state.in_flight(block('complete 2026-11-04 — ship pending'))) == 1
+def test_complete_without_outcome_does_not_hold_the_slot():
+    """A built task waiting on a human merge gate must not block the next one.
+
+    The slot is about attention; whether the work LANDED is tracked separately,
+    by awaiting_outcome. Conflating them made the workflow hostage to review
+    latency.
+    """
+    assert workflow_state.in_flight(block('complete 2026-11-04 — ship pending')) == []
+
+
+def test_complete_without_outcome_is_still_chased():
+    """Releasing the slot must not mean forgetting the task."""
+    assert workflow_state.awaiting_outcome(block('complete 2026-11-04 — ship pending')) == \
+        [('01-041126', 'complete 2026-11-04 — ship pending')]
+
+
+def test_a_recorded_outcome_ends_the_chase():
+    assert workflow_state.awaiting_outcome(block('complete 2026-11-04', 'merged #12')) == []
 
 
 def test_merged_outcome_releases_the_slot():
@@ -50,9 +65,11 @@ def test_parked_task_is_not_in_flight():
     assert workflow_state.in_flight(block('pending — parked 2026-11-04')) == []
 
 
-def test_unrecognised_outcome_does_not_release_the_slot():
+def test_unrecognised_outcome_does_not_settle_a_task():
     """Only the three terminal words settle a task — not any text at all."""
-    assert len(workflow_state.in_flight(block('complete 2026-11-04', 'probably fine'))) == 1
+    assert workflow_state.settled(block('complete 2026-11-04', 'probably fine')) == []
+    assert len(workflow_state.awaiting_outcome(block('complete 2026-11-04',
+                                                     'probably fine'))) == 1
 
 
 def test_settled_reports_the_recorded_outcome():

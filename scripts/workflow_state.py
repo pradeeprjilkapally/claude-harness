@@ -204,18 +204,24 @@ def terminal_outcome(outcome):
 
 
 def in_flight(task_md_text):
-    """Active blocks still being worked, as (task_id, status).
+    """Active blocks still being WORKED, as (task_id, status).
 
-    A block leaves the in-flight set only when it is parked or carries a
-    terminal Outcome. `Status: complete` alone does NOT release the slot: the
-    PR may still be open, and a repo that treats `complete — ship pending` as
-    finished loses track of whether the work ever landed.
+    This is the one-task-at-a-time guard, and it is about attention, not
+    bookkeeping. A block releases the slot when it is parked or when its build
+    is complete — a task sitting at `complete — ship pending` is waiting on a
+    human merge gate, and blocking the next task on that would make the whole
+    workflow hostage to how fast PRs get reviewed.
+
+    Being finished is a separate question, tracked by `awaiting_outcome` and
+    `settled`: the build being done is not the work having landed.
     """
     live = []
     for tid, status, outcome in active_blocks(task_md_text):
         low = status.lower()
         if low.startswith('pending') or 'parked' in low:
-            continue                       # deliberately set aside, not in flight
+            continue                       # deliberately set aside
+        if low.startswith('complete'):
+            continue                       # built; awaiting a merge, not worked
         if terminal_outcome(outcome):
             continue                       # merged / abandoned / taken back
         live.append((tid, status))
@@ -268,13 +274,20 @@ def cmd_guard():
     if len(live) > 1:
         ids = ', '.join(t for t, _ in live)
         print(json.dumps({'systemMessage':
-                          f'WORKFLOW: {len(live)} in-flight tasks under ## Active '
-                          f'({ids}). One primary task at a time — park the others, '
-                          f'or finish them: a task is done only once its Outcome is '
-                          f'recorded (merged / abandoned / taken-back). Run '
-                          f'`python3 scripts/check_merged.py` to see which already '
-                          f'merged.'}))
+                          f'WORKFLOW: {len(live)} tasks being worked under ## Active '
+                          f'({ids}). One primary task at a time — park or finish the '
+                          f'others before starting another.'}))
         return 1
+    # A separate, NON-BLOCKING nudge. These tasks are built and waiting on a
+    # merge: worth chasing, never a reason to stop the next one from starting.
+    stale = awaiting_outcome(text)
+    if stale:
+        ids = ', '.join(t for t, _ in stale)
+        print(json.dumps({'systemMessage':
+                          f'WORKFLOW: {len(stale)} task(s) complete with no Outcome '
+                          f'recorded ({ids}) — not finished until the PR merges, is '
+                          f'abandoned, or is taken back. '
+                          f'`python3 scripts/check_merged.py` reports what landed.'}))
     return 0
 
 
